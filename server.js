@@ -5,13 +5,13 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ---------- Middleware ----------
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.json());
 app.use(express.static("public")); // Serve frontend files
 
 // ---------- File paths ----------
@@ -162,6 +162,11 @@ app.get("/api/jobs", (req, res) => {
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
+const schedulerRoutes = require("./schedulerRoutes");
+
+// API routes for scheduler
+app.use("/api", schedulerRoutes);
 
 // ---------- Start Server ----------
 app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));

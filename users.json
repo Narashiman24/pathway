@@ -1,3 +1,25 @@
 [
-  {}
+  {},
+  {
+    "id": 2,
+    "uniqueId": 87499239,
+    "firstName": "Amogh",
+    "lastName": "Kulkarni",
+    "birthday": "2003-10-02",
+    "email": "amoghkulkarni.debate@gmail.com",
+    "occupation": "Student",
+    "password": "$2b$10$utglOaES7k7auJSSrzan5OMYClALVHXQEY0eeZzfyxLXo26Zhmega",
+    "address": {
+      "street": "3278 Bransley Way",
+      "city": "Duluth",
+      "state": "GA",
+      "zip": "30097"
+    },
+    "education": {
+      "college": "Georgia State University",
+      "certificate": "BA Computer Science",
+      "gradDate": "2026-04-26"
+    },
+    "registeredAt": "2025-11-17T19:55:46.384Z"
+  }
 ]
