@@ -8,8 +8,15 @@
 <body>
 <div class="shell">
     <div class="banner">
-        <h1 id="welcome">Welcome!</h1>
-        <p id="loginMeta">Last login: —</p>
+        <div>
+            <h1 id="welcome">Welcome!</h1>
+            <p id="loginMeta">Last login: —</p>
+        </div>
+        <div class="header-links">
+            <a href="/dashboard.html">Home</a>
+            <a href="/scheduler.html">Scheduler</a>
+            <a href="/resume.html">Resume Reformatter</a>
+        </div>
     </div>
 
     <div class="grid" style="margin-top:20px">
@@ -39,9 +46,14 @@
     </div>
 
     <button class="logout" id="logoutBtn">Logout</button>
-    <a href="/scheduler.html">
-        <button>Open Scheduler</button>
-    </a>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;">
+        <a href="/scheduler.html">
+            <button type="button">Open Scheduler</button>
+        </a>
+        <a href="/resume.html">
+            <button type="button">Resume Reformatter</button>
+        </a>
+    </div>
 
 </div>
 

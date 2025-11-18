@@ -1,10 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // ---------- Step 0: Check if user is logged in ----------
+    const requiresAuth = document.body?.dataset?.requireAuth === "true";
     const currentUser = JSON.parse(localStorage.getItem("user"));
-    if (!currentUser) {
+    if (requiresAuth && !currentUser) {
         // If not logged in, redirect to login page
         window.location.href = "login.html";
+        return;
     }
 
     // ---------- Step 1: Logout ----------

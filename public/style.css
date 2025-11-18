@@ -34,14 +34,14 @@ p{color:var(--muted)}
 
 .form-group{margin:14px 0}
 label{display:block;margin:0 0 6px;font-weight:600}
-input,select,button{
+input,select,textarea,button{
     font-size:16px; border-radius:10px;
 }
-input,select{
+input,select,textarea{
     width:100%; padding:12px 14px; border:1px solid var(--border);
     outline:none; background:#fff; transition:border .15s ease, box-shadow .15s ease;
 }
-input:focus,select:focus{
+input:focus,select:focus,textarea:focus{
     border-color:var(--primary);
     box-shadow:0 0 0 4px rgba(91,124,255,.12);
 }
@@ -64,6 +64,14 @@ button:disabled{opacity:.55; cursor:not-allowed; box-shadow:none}
 #message{margin-top:10px; font-weight:600; text-align:center}
 
 .hidden{display:none}
+.result-block{
+    white-space:pre-wrap;
+    background:#f8f9ff;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
 
 /* progress */
 .progress{
@@ -98,6 +106,36 @@ button:disabled{opacity:.55; cursor:not-allowed; box-shadow:none}
 .grid{
     display:grid; gap:16px; margin-top:16px;
     grid-template-columns: repeat( auto-fit, minmax(260px, 1fr) );
+}
+.header-links{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:10px;
+}
+.header-links a{
+    color:var(--primary-dark);
+    font-weight:600;
+    text-decoration:none;
+    background:rgba(91,124,255,0.1);
+    padding:6px 12px;
+    border-radius:999px;
+}
+.header-links a:hover{
+    background:rgba(91,124,255,0.2);
+}
+.resume-grid{
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.resume-grid textarea{
+    min-height:220px;
+}
+.resume-results ul{
+    padding-left:20px;
+    margin-top:6px;
+}
+.resume-results li{
+    margin-bottom:4px;
 }
 .card{
     background:#fff; border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow);

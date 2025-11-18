@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const multer = require("multer");
@@ -5,14 +6,16 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
+const OpenAI = require("openai");
 const app = express();
 const PORT = process.env.PORT || 3000;
+const openaiClient = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 // ---------- Middleware ----------
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.json());
-app.use(express.static("public")); // Serve frontend files
+app.use(express.static("public", { index: false })); // Serve frontend files
 
 // ---------- File paths ----------
 const USERS_FILE = path.join(__dirname, "users.json");
@@ -98,7 +101,7 @@ app.post("/api/register", async (req, res) => {
     users.push(newUser);
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 
-    console.log(`✅ Registered new user: ${firstName} ${lastName} (ID: ${uniqueId})`);
+    console.log(` Registered new user: ${firstName} ${lastName} (ID: ${uniqueId})`);
     res.json({ message: "Registration successful!", user: { ...newUser, password: undefined } });
 });
 
@@ -151,6 +154,54 @@ app.post("/api/upload", upload.single("resume"), (req, res) => {
     res.json({ message: `Resume '${file.originalname}' analyzed successfully!`, skills: extractedSkills });
 });
 
+// ---------- API: Resume Reformatter (OpenAI) ----------
+app.post("/api/resume/reformatter", async (req, res) => {
+    if (!openaiClient) {
+        return res.status(500).json({ message: "OpenAI API key is not configured on the server." });
+    }
+
+    const { resumeText, jobDescription } = req.body || {};
+    if (!resumeText || !jobDescription) {
+        return res.status(400).json({ message: "Resume text and job description are required." });
+    }
+
+    try {
+        const completion = await openaiClient.chat.completions.create({
+            model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+            temperature: 0.2,
+            response_format: { type: "json_object" },
+            messages: [
+                {
+                    role: "system",
+                    content: [
+                        {
+                            type: "text",
+                            text: "You are an expert resume coach who tailors resumes to target job postings. Respond strictly with JSON containing: (1) summary - 2 sentences selling why the candidate is ideal for the role, (2) tailoredResume - a single ATS-friendly resume text string (no nested JSON) that blends the candidate's experience with the job requirements, (3) emphasizedSkills - array of prominent skills/keywords used, (4) suggestions - array of action items. Ensure tailoredResume is a string, even if it has multiple sections."
+                        }
+                    ]
+                },
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "text",
+                            text: `ORIGINAL RESUME:\n${resumeText.trim()}\n\nTARGET JOB DESCRIPTION:\n${jobDescription.trim()}`
+                        }
+                    ]
+                }
+            ]
+        });
+
+        const content = completion.choices?.[0]?.message?.content || "{}";
+        const formatted = JSON.parse(content);
+        res.json(formatted);
+    } catch (error) {
+        console.error("OpenAI resume reformatter error:", error);
+        const message = error?.response?.data?.error?.message || error.message || "Failed to generate tailored resume.";
+        res.status(500).json({ message });
+    }
+});
+
 // ---------- API: Jobs ----------
 app.get("/api/jobs", (req, res) => {
     const jobsPath = path.join(__dirname, "public", "jobs.json");
@@ -160,7 +211,7 @@ app.get("/api/jobs", (req, res) => {
 
 // ---------- Default Route ----------
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
+    res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
 const schedulerRoutes = require("./schedulerRoutes");
