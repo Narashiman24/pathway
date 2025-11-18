@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const bodyParser = require("body-parser");
 const multer = require("multer");
@@ -7,11 +9,13 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const app = express();
 const PORT = process.env.PORT || 3000;
+const elevatorRoutes = require("./elevatorRoutes");
 
 // ---------- Middleware ----------
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.json());
+app.use("/api", elevatorRoutes);
 app.use(express.static("public")); // Serve frontend files
 
 // ---------- File paths ----------
