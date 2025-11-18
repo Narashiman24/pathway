@@ -7,8 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
 const OpenAI = require("openai");
-const pdfParseModule = require("pdf-parse");
-const pdfParse = typeof pdfParseModule === "function" ? pdfParseModule : pdfParseModule.default;
+const { PDFParse } = require("pdf-parse");
 const mammoth = require("mammoth");
 const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const app = express();
@@ -68,8 +67,13 @@ async function extractTextFromFile(file) {
     const buffer = fs.readFileSync(filePath);
 
     if (ext === ".pdf" || file.mimetype === "application/pdf") {
-        const parsed = await pdfParse(buffer);
-        return parsed.text || "";
+        const parser = new PDFParse({ data: buffer });
+        try {
+            const parsed = await parser.getText();
+            return parsed?.text || "";
+        } finally {
+            await parser.destroy().catch(() => {});
+        }
     }
 
     if (ext === ".docx" || file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
@@ -231,6 +235,7 @@ app.post("/api/upload", upload.single("resume"), async (req, res) => {
         console.log("Uploaded resume analyzed:", file.originalname);
         res.json({
             message: `Resume '${file.originalname}' analyzed successfully!`,
+            resumeText: resumeText.trim(),
             skills,
             summary,
             recommendedRoles

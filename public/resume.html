@@ -9,9 +9,12 @@
 <body>
 <div class="shell">
     <div class="banner" style="margin-bottom:20px">
-        <div>
-            <h1>AI Resume Reformatter</h1>
-            <p style="margin:4px 0 0">Paste your resume and the target job description. Pathway will tailor a version aligned with the posting.</p>
+        <div class="banner-header">
+            <div>
+                <h1>AI Resume Reformatter</h1>
+                <p style="margin:4px 0 0">Paste your resume and the target job description. Pathway will tailor a version aligned with the posting.</p>
+            </div>
+            <button type="button" class="banner-cta" id="resumeDashboardBtn">Back to Dashboard</button>
         </div>
         <div class="header-links">
             <a href="/dashboard.html">Home</a>
@@ -24,6 +27,13 @@
     <div class="grid resume-grid">
         <div class="card">
             <form id="reformatterForm">
+                <div class="form-group">
+                    <label for="resumeFileInput">Import Resume File (PDF, DOCX, TXT)</label>
+                    <input id="resumeFileInput" type="file" accept=".pdf,.docx,.txt"/>
+                    <button type="button" id="resumeUploadBtn" style="margin-top:8px">Extract Text & Skills</button>
+                    <p id="uploadStatus" class="muted" style="margin-top:6px"></p>
+                </div>
+
                 <div class="form-group">
                     <label for="resumeInput">Resume (plain text)</label>
                     <textarea id="resumeInput" rows="12" placeholder="Paste your resume content here"></textarea>
@@ -59,5 +69,10 @@
 </div>
 
 <script src="resume.js"></script>
+<script>
+    document.getElementById("resumeDashboardBtn").addEventListener("click", () => {
+        window.location.href = "/dashboard.html";
+    });
+</script>
 </body>
 </html>

@@ -8,9 +8,12 @@
 <body>
 <div class="shell">
     <div class="banner">
-        <div>
-            <h1 id="welcome">Welcome!</h1>
-            <p id="loginMeta">Last login: —</p>
+        <div class="banner-header">
+            <div>
+                <h1 id="welcome">Welcome!</h1>
+                <p id="loginMeta">Last login: —</p>
+            </div>
+            <button type="button" class="banner-cta" id="bannerResumeBtn">Tailor Resume</button>
         </div>
         <div class="header-links">
             <a href="/dashboard.html">Home</a>
@@ -94,6 +97,10 @@
     document.getElementById("logoutBtn").addEventListener("click", ()=>{
         localStorage.removeItem("loggedInUser");
         location.href = "login.html";
+    });
+
+    document.getElementById("bannerResumeBtn").addEventListener("click", ()=>{
+        location.href = "resume.html";
     });
 </script>
 </body>

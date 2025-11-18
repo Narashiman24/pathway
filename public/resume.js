@@ -10,6 +10,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const tailoredResume = document.getElementById("tailoredResume");
     const skillsList = document.getElementById("skillsList");
     const suggestionsList = document.getElementById("suggestionsList");
+    const resumeFileInput = document.getElementById("resumeFileInput");
+    const resumeUploadBtn = document.getElementById("resumeUploadBtn");
+    const uploadStatus = document.getElementById("uploadStatus");
 
     const normalizeResumeText = (value) => {
         if (!value) return "—";
@@ -109,6 +112,57 @@ document.addEventListener("DOMContentLoaded", () => {
             resultPlaceholder.textContent = "Server error. Please try again.";
             resultInner.classList.add("hidden");
         }
+    }
+
+    if (resumeUploadBtn && resumeFileInput) {
+        resumeUploadBtn.addEventListener("click", async () => {
+            const file = resumeFileInput.files?.[0];
+            if (!file) {
+                if (uploadStatus) {
+                    uploadStatus.textContent = "Please choose a file first.";
+                    uploadStatus.style.color = "var(--bad)";
+                }
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("resume", file);
+            if (uploadStatus) {
+                uploadStatus.textContent = "⏳ Extracting text and skills...";
+                uploadStatus.style.color = "#333";
+            }
+
+            try {
+                const response = await fetch("/api/upload", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || "Resume upload failed.");
+                }
+
+                if (data.resumeText) {
+                    resumeInput.value = data.resumeText;
+                }
+
+                const skills = Array.isArray(data.skills) ? data.skills : [];
+                if (skills.length) {
+                    localStorage.setItem("resumeKeywords", JSON.stringify(skills));
+                }
+
+                if (uploadStatus) {
+                    uploadStatus.textContent = data.message || "Resume processed.";
+                    uploadStatus.style.color = "var(--ok)";
+                }
+            } catch (err) {
+                console.error("Resume upload failed:", err);
+                if (uploadStatus) {
+                    uploadStatus.textContent = err.message || "Unable to process resume. Try again.";
+                    uploadStatus.style.color = "var(--bad)";
+                }
+            }
+        });
     }
 
     form.addEventListener("submit", handleSubmit);
