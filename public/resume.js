@@ -74,8 +74,11 @@ document.addEventListener("DOMContentLoaded", () => {
             tailoredSummary.textContent = data.summary || "—";
             tailoredResume.textContent = normalizeResumeText(data.tailoredResume);
 
+            const emphasizedSkills = Array.isArray(data.emphasizedSkills) ? data.emphasizedSkills : [];
+            localStorage.setItem("resumeKeywords", JSON.stringify(emphasizedSkills));
+
             skillsList.innerHTML = "";
-            (data.emphasizedSkills || []).forEach((skill) => {
+            emphasizedSkills.forEach((skill) => {
                 const li = document.createElement("li");
                 li.textContent = skill;
                 skillsList.appendChild(li);

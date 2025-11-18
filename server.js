@@ -7,6 +7,10 @@ const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
 const OpenAI = require("openai");
+const pdfParseModule = require("pdf-parse");
+const pdfParse = typeof pdfParseModule === "function" ? pdfParseModule : pdfParseModule.default;
+const mammoth = require("mammoth");
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const app = express();
 const PORT = process.env.PORT || 3000;
 const openaiClient = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
@@ -57,6 +61,72 @@ function generateUniqueId(users) {
 
 // ---------- Upload Setup ----------
 const upload = multer({ dest: "uploads/" });
+
+async function extractTextFromFile(file) {
+    const filePath = file.path;
+    const ext = path.extname(file.originalname).toLowerCase();
+    const buffer = fs.readFileSync(filePath);
+
+    if (ext === ".pdf" || file.mimetype === "application/pdf") {
+        const parsed = await pdfParse(buffer);
+        return parsed.text || "";
+    }
+
+    if (ext === ".docx" || file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        const result = await mammoth.extractRawText({ buffer });
+        return result.value || "";
+    }
+
+    return buffer.toString("utf8");
+}
+
+async function analyzeResume(text) {
+    if (!openaiClient) {
+        throw new Error("OpenAI API key is not configured on the server.");
+    }
+
+    const completion = await openaiClient.chat.completions.create({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+            {
+                role: "system",
+                content: "You extract resume insights. Respond with JSON: summary (2 sentences), skills (array of skill names), recommendedRoles (array of role titles)."
+            },
+            {
+                role: "user",
+                content: text.slice(0, 15000)
+            }
+        ]
+    });
+
+    return JSON.parse(completion.choices?.[0]?.message?.content || "{}");
+}
+
+async function fetchLiveJobs() {
+    const REMOTIVE_ENDPOINT = "https://remotive.com/api/remote-jobs";
+    const url = `${REMOTIVE_ENDPOINT}?limit=30`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Remotive API error: ${res.status}`);
+    const payload = await res.json();
+    const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
+    return jobs.slice(0, 20).map((job) => {
+        const tags = Array.isArray(job.tags) ? job.tags.map((t) => t.toLowerCase()) : [];
+        const cleanDescription = (job.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        return {
+            title: job.title,
+            company: job.company_name,
+            location: job.candidate_required_location || job.location || "Remote",
+            type: job.job_type || "Remote",
+            salary: job.salary || job.salary_range || "",
+            logo: job.company_logo_url || "",
+            link: job.url,
+            description: cleanDescription.slice(0, 260) + (cleanDescription.length > 260 ? "…" : ""),
+            keywords: tags
+        };
+    });
+}
 
 // ---------- API: Register New User ----------
 app.post("/api/register", async (req, res) => {
@@ -145,13 +215,32 @@ app.get("/api/colleges", (req, res) => {
 });
 
 // ---------- API: Resume Upload ----------
-app.post("/api/upload", upload.single("resume"), (req, res) => {
+app.post("/api/upload", upload.single("resume"), async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No file uploaded" });
 
-    console.log("Uploaded resume:", file.originalname);
-    const extractedSkills = ["React", "SQL", "Node.js", "Problem Solving"];
-    res.json({ message: `Resume '${file.originalname}' analyzed successfully!`, skills: extractedSkills });
+    try {
+        const resumeText = await extractTextFromFile(file);
+        if (!resumeText.trim()) throw new Error("Unable to extract readable text from resume.");
+
+        const analysis = await analyzeResume(resumeText);
+        const skills = analysis.skills || [];
+        const summary = analysis.summary || "";
+        const recommendedRoles = analysis.recommendedRoles || [];
+
+        console.log("Uploaded resume analyzed:", file.originalname);
+        res.json({
+            message: `Resume '${file.originalname}' analyzed successfully!`,
+            skills,
+            summary,
+            recommendedRoles
+        });
+    } catch (error) {
+        console.error("Resume upload analysis error:", error);
+        res.status(500).json({ message: error.message || "Failed to analyze resume." });
+    } finally {
+        fs.unlink(file.path, () => {});
+    }
 });
 
 // ---------- API: Resume Reformatter (OpenAI) ----------
@@ -203,10 +292,19 @@ app.post("/api/resume/reformatter", async (req, res) => {
 });
 
 // ---------- API: Jobs ----------
-app.get("/api/jobs", (req, res) => {
+app.get("/api/jobs", async (req, res) => {
+    try {
+        const liveJobs = await fetchLiveJobs();
+        if (liveJobs.length) {
+            return res.json(liveJobs);
+        }
+    } catch (err) {
+        console.error("Live job feed error:", err.message);
+    }
+
     const jobsPath = path.join(__dirname, "public", "jobs.json");
-    const jobs = fs.existsSync(jobsPath) ? JSON.parse(fs.readFileSync(jobsPath, "utf8")) : [];
-    res.json(jobs);
+    const fallbackJobs = fs.existsSync(jobsPath) ? JSON.parse(fs.readFileSync(jobsPath, "utf8")) : [];
+    res.json(fallbackJobs);
 });
 
 // ---------- Default Route ----------

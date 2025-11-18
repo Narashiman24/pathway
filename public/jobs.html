@@ -1,32 +1,42 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Pathway — Job Recommendations</title>
+    <title>Pathway — Job Matches</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-    <h1>Pathway — Job Recommendations</h1>
-    <nav>
-        <a href="index.html">Upload Resume</a> |
-        <a href="jobs.html">Job Recommendations</a> |
-        <a href="resume.html">Resume Reformatter</a>
-    </nav>
-</header>
+<div class="shell">
+    <div class="banner">
+        <div>
+            <h1>Job Matches</h1>
+            <p>Paste your resume keywords and Pathway will surface opportunities aligned with your skills.</p>
+        </div>
+        <div class="header-links">
+            <a href="/dashboard.html">Home</a>
+            <a href="/index.html">Upload Resume</a>
+            <a href="/resume.html">Resume Reformatter</a>
+            <a href="/jobs.html">Job Recommendations</a>
+        </div>
+    </div>
 
-<main class="container">
-    <section class="card">
-        <h2>Recommended Jobs</h2>
-        <p>Click the button below to get job suggestions from our system.</p>
-        <button id="loadJobsBtn">Recommend Jobs</button>
-        <div id="jobs" class="jobs-grid"></div>
-    </section>
-</main>
+    <div id="pendingApplicationBanner" class="pending-banner hidden"></div>
 
-<footer>
-    <small>Frontend by Sultan Abuhijleh — Group 5 (Sprint 3)</small>
-</footer>
+    <div class="jobs-layout">
+        <div class="card jobs-filter">
+            <h2>Paste Resume Highlights</h2>
+            <p>We look for overlapping keywords between your resume and the job descriptions.</p>
+            <textarea id="resumeKeywordsInput" rows="10" placeholder="Paste your resume summary, skills, or bullet points here..."></textarea>
+            <button id="filterJobsBtn">Find Matching Jobs</button>
+            <p id="jobStatus" class="muted"></p>
+        </div>
+
+        <div class="card jobs-results">
+            <h2>Opportunities</h2>
+            <div id="jobsList" class="jobs-grid"></div>
+        </div>
+    </div>
+</div>
 
 <script src="app.js"></script>
 </body>

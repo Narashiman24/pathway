@@ -35,25 +35,252 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch("/api/upload", { method: "POST", body: formData });
             const data = await response.json();
 
-            out.innerHTML = `✅ ${data.message}<br><strong>Extracted Skills:</strong> ${data.skills.join(", ")}`;
+            if (!response.ok) {
+                out.innerHTML = `❌ ${data.message || "Failed to analyze resume."}`;
+                return;
+            }
+
+            const skillsArray = Array.isArray(data.skills) ? data.skills : [];
+            localStorage.setItem("resumeKeywords", JSON.stringify(skillsArray));
+
+            const skills = skillsArray.length ? skillsArray.join(", ") : "Not detected";
+            const summary = data.summary ? `<strong>Summary:</strong> ${data.summary}<br>` : "";
+            const roles = Array.isArray(data.recommendedRoles) && data.recommendedRoles.length
+                ? `<strong>Recommended Roles:</strong> ${data.recommendedRoles.join(", ")}<br>`
+                : "";
+
+            out.innerHTML = `✅ ${data.message}<br>${summary}${roles}<strong>Extracted Skills:</strong> ${skills}`;
         });
     }
 
     // ---------- Step 3: Handle Job Recommendations ----------
-    const loadJobsBtn = document.getElementById("loadJobsBtn");
-    if (loadJobsBtn) {
-        loadJobsBtn.addEventListener("click", async () => {
-            const res = await fetch("/api/jobs");
-            const jobs = await res.json();
-            const container = document.getElementById("jobs");
-            container.innerHTML = jobs.map(job =>
-                `<div class="job-card">
-                   <h3>${job.title}</h3>
-                   <p>${job.company} — ${job.location}</p>
-                   <a href="${job.link}" target="_blank">Apply</a>
-                 </div>`
-            ).join("");
+    const filterJobsBtn = document.getElementById("filterJobsBtn");
+    const resumeKeywordsInput = document.getElementById("resumeKeywordsInput");
+    const jobsList = document.getElementById("jobsList");
+    const jobStatus = document.getElementById("jobStatus");
+    const pendingBanner = document.getElementById("pendingApplicationBanner");
+    const PENDING_KEY = "pendingApplications";
+    const TRACKED_KEY = "appliedJobsLog";
+    let cachedJobs = [];
+
+    sessionStorage.removeItem("pendingBannerSnooze");
+
+    const getStoredResumeKeywords = () => {
+        try {
+            const raw = localStorage.getItem("resumeKeywords");
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed.map((entry) => entry?.toString().trim()).filter(Boolean);
+            }
+            if (typeof parsed === "string") {
+                return parsed.split(/[,;]+/).map((entry) => entry.trim()).filter(Boolean);
+            }
+            return [];
+        } catch (err) {
+            console.warn("Unable to parse stored resume keywords", err);
+            return [];
+        }
+    };
+
+    const fetchJobs = async () => {
+        if (cachedJobs.length) return cachedJobs;
+        const res = await fetch("/api/jobs");
+        cachedJobs = await res.json();
+        return cachedJobs;
+    };
+
+    const normalizeWord = (word) => word.toLowerCase().replace(/[^a-z0-9+]/g, "");
+
+    const extractKeywords = (text) => {
+        return Array.from(
+            new Set(
+                text
+                    .split(/\s+/)
+                    .map(normalizeWord)
+                    .filter((word) => word.length > 3)
+            )
+        );
+    };
+
+    const getPendingApplications = () => JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+    const savePendingApplications = (queue) => localStorage.setItem(PENDING_KEY, JSON.stringify(queue));
+    const logApplication = (job) => {
+        const log = JSON.parse(localStorage.getItem(TRACKED_KEY) || "[]");
+        log.push({ ...job, loggedAt: new Date().toISOString() });
+        localStorage.setItem(TRACKED_KEY, JSON.stringify(log));
+    };
+    const renderPendingBanner = () => {
+        if (!pendingBanner) return;
+        if (sessionStorage.getItem("pendingBannerSnooze") === "true") {
+            pendingBanner.classList.add("hidden");
+            return;
+        }
+        const queue = getPendingApplications();
+        if (!queue.length) {
+            pendingBanner.classList.add("hidden");
+            pendingBanner.innerHTML = "";
+            return;
+        }
+        const job = queue[0];
+        pendingBanner.classList.remove("hidden");
+        pendingBanner.innerHTML = `
+            <div>
+                <strong>Did you apply?</strong><br>
+                ${job.title} @ ${job.company}
+            </div>
+            <div class="banner-actions">
+                <button type="button" data-banner-action="log">Yes, log it</button>
+                <button type="button" data-banner-action="later">Remind me later</button>
+                <button type="button" data-banner-action="skip">Skip</button>
+            </div>
+        `;
+    };
+    const queueJobForTracker = (job) => {
+        const queue = getPendingApplications();
+        queue.push({ ...job, queuedAt: new Date().toISOString() });
+        savePendingApplications(queue);
+        sessionStorage.removeItem("pendingBannerSnooze");
+        renderPendingBanner();
+    };
+    if (pendingBanner) {
+        pendingBanner.addEventListener("click", (event) => {
+            const action = event.target.dataset.bannerAction;
+            if (!action) return;
+            const queue = getPendingApplications();
+            if (!queue.length) {
+                pendingBanner.classList.add("hidden");
+                return;
+            }
+            const current = queue[0];
+            if (action === "log") {
+                logApplication(current);
+                queue.shift();
+                savePendingApplications(queue);
+                alert(`Saved ${current.title} at ${current.company} to your tracker queue.`);
+            } else if (action === "skip") {
+                queue.shift();
+                savePendingApplications(queue);
+            } else if (action === "later") {
+                sessionStorage.setItem("pendingBannerSnooze", "true");
+                pendingBanner.classList.add("hidden");
+                return;
+            }
+            sessionStorage.removeItem("pendingBannerSnooze");
+            renderPendingBanner();
         });
+    }
+
+    const renderJobs = (jobs) => {
+        if (!jobsList) return;
+        if (!jobs.length) {
+            jobsList.innerHTML = "<p>No matching job postings at the moment.</p>";
+            return;
+        }
+        jobsList.innerHTML = jobs.map(job => {
+            const logoContent = job.logo
+                ? `<img src="${job.logo}" alt="${job.company} logo"/>`
+                : `<span>${job.company?.charAt(0) || "?"}</span>`;
+            const tags = [
+                job.type,
+                job.salary,
+                job.location
+            ].filter(Boolean);
+            const keywordTags = (job.keywords || []).slice(0, 4).map(k => `<span>${k}</span>`).join("");
+            const trackerPayload = encodeURIComponent(JSON.stringify({
+                title: job.title,
+                company: job.company,
+                location: job.location,
+                salary: job.salary,
+                type: job.type,
+                link: job.link,
+                description: job.description
+            }));
+            return `
+                <div class="job-card">
+                    <div class="job-logo">${logoContent}</div>
+                    <div class="job-body">
+                        <h3>${job.title}</h3>
+                        <p class="job-meta">${job.company}${job.location ? " · " + job.location : ""}</p>
+                        <p>${job.description || ""}</p>
+                        <div class="job-tags">
+                            ${tags.map(tag => `<span>${tag}</span>`).join("")}
+                            ${keywordTags}
+                        </div>
+                        <div class="job-actions">
+                            <a class="job-apply" data-job="${trackerPayload}" href="${job.link}" target="_blank" rel="noopener">View / Apply</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    };
+
+    if (filterJobsBtn && resumeKeywordsInput) {
+        const storedWords = getStoredResumeKeywords();
+        if (!resumeKeywordsInput.value.trim() && storedWords.length) {
+            resumeKeywordsInput.value = storedWords.join(", ");
+            if (jobStatus) {
+                jobStatus.textContent = "Using skills from your last analyzed resume. Adjust below if needed.";
+            }
+        } else if (jobStatus && !storedWords.length) {
+            jobStatus.textContent = "Upload your resume or enter keywords to get tailored roles.";
+        }
+
+        filterJobsBtn.addEventListener("click", async () => {
+            if (jobStatus) {
+                jobStatus.textContent = "Matching jobs to your resume...";
+            }
+
+            const filterText = resumeKeywordsInput.value.trim();
+            let keywords = extractKeywords(filterText);
+            if (!keywords.length) {
+                keywords = getStoredResumeKeywords()
+                    .map((word) => normalizeWord(word))
+                    .filter(Boolean);
+            }
+            if (!keywords.length) {
+                if (jobStatus) {
+                    jobStatus.textContent = "Please upload a resume or type some keywords to get recommendations.";
+                }
+                alert("Upload your resume on the Upload Resume page or enter keywords to get job recommendations.");
+                return;
+            }
+            const jobs = await fetchJobs();
+
+            const filtered = jobs.filter(job => {
+                const jobKeywords = (job.keywords || []).map(normalizeWord);
+                return keywords.some(key => jobKeywords.includes(key));
+            });
+
+            if (jobStatus) {
+                jobStatus.textContent = `Showing ${filtered.length} role(s) that mention ${keywords.slice(0, 5).join(", ")}`;
+            }
+
+            renderJobs(filtered);
+        });
+
+        // initial load
+        fetchJobs().then((jobs) => {
+            renderJobs(jobs);
+            if (jobStatus) {
+                jobStatus.textContent = storedWords.length
+                    ? `Using ${storedWords.length} stored skill(s).`
+                    : `Showing all ${jobs.length} role(s). Paste resume keywords to refine.`;
+            }
+            renderPendingBanner();
+        });
+
+        if (jobsList) {
+            jobsList.addEventListener("click", (event) => {
+                const link = event.target.closest(".job-apply");
+                if (!link) return;
+                const jobData = JSON.parse(decodeURIComponent(link.dataset.job || "%7B%7D"));
+                queueJobForTracker(jobData);
+            });
+        }
+    } else {
+        renderPendingBanner();
     }
 
     // ---------- Step 4: Handle Login ----------
